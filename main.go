@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
@@ -20,6 +21,7 @@ func main() {
 
 	router.GET("/albums", handleListAlbums(db))
 	router.POST("/albums", handleCreateAlbums(db))
+	router.GET("/albums/:id", handleGetAlbum(db))
 	// TODO rest of albums CRUD
 
 	// TODO CRUD tracks
@@ -108,6 +110,7 @@ func handleCreateAlbums(db *gorm.DB) func(c *gin.Context) {
 		var params CreateAlbumParams
 		err := c.BindJSON(&params)
 		if err != nil {
+			// TODO can you render this better?
 			c.AbortWithStatusJSON(422, gin.H{
 				"error": err.Error(),
 			})
@@ -157,6 +160,23 @@ func createAlbum(db *gorm.DB) func(title string, year uint) Album {
 		album := Album{Title: title, Year: year}
 		db.Create(&album)
 		return album
+	}
+}
+
+func handleGetAlbum(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var album Album
+		db.Where("id = ?", id).First(&album)
+		if db.NewRecord(&album) {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+				"message": fmt.Sprintf("Cannot find album with id %s", id),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"album": renderAlbum(album),
+		})
 	}
 }
 
