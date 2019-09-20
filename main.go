@@ -1,8 +1,5 @@
 package main
 
-// TODO add routes
-// work through routes one at a time, end to end
-
 import (
 	"fmt"
 	"log"
@@ -10,20 +7,29 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/qor/validations"
 )
 
 // MAIN
 func main() {
 	db := initDB()
+	validations.RegisterCallbacks(db)
 	seedDB(db)
 
 	router := gin.Default()
+
 	router.GET("/albums", handleListAlbums(db))
+	router.POST("/albums", handleCreateAlbums(db))
+	// TODO rest of albums CRUD
+
+	// TODO CRUD tracks
+
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "pong",
 		})
 	})
+
 	router.Run()
 }
 
@@ -46,7 +52,6 @@ func seedDB(db *gorm.DB) {
 		return
 	}
 
-	// TODO Seed data here
 	album = createAlbum(db)("Blonde", 2016)
 	createAlbum(db)("Blonde on Blonde", 1966)
 	createAlbum(db)("Harvest Moon", 1992)
@@ -73,8 +78,8 @@ func seedDB(db *gorm.DB) {
 // Album database model
 type Album struct {
 	gorm.Model
-	Title string `gorm:"not null"`
-	Year  uint   `gorm:"not null"`
+	Title string `gorm:"not null" valid:"required"`
+	Year  uint   `gorm:"not null" valid:"required"`
 }
 
 // AlbumVM view model for rendering Album.
@@ -83,13 +88,43 @@ type AlbumVM struct {
 	Year  uint   `json:"year"`
 }
 
-// TODO validations would be nice
+// CreateAlbumParams represents params for creating and album.
+type CreateAlbumParams struct {
+	Title string `json:"title" binding:"required"`
+	Year  uint   `json:"year" binding:"required"`
+}
 
 func handleListAlbums(db *gorm.DB) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		albums := listAlbums(db)()
 		c.JSON(200, gin.H{
 			"albums": renderAlbums(albums),
+		})
+	}
+}
+
+func handleCreateAlbums(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var params CreateAlbumParams
+		err := c.BindJSON(&params)
+		if err != nil {
+			c.AbortWithStatusJSON(422, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		album := Album{Title: params.Title, Year: params.Year}
+		errors := db.Create(&album).GetErrors()
+		if len(errors) > 0 {
+			c.AbortWithStatusJSON(500, gin.H{
+				"message": "An internal server error occurred.",
+			})
+			return
+		}
+
+		c.JSON(201, gin.H{
+			"album": renderAlbum(album),
 		})
 	}
 }
@@ -157,7 +192,6 @@ func deleteAlbum(db *gorm.DB) func(id uint) (Album, error) {
 // Track DB model
 type Track struct {
 	gorm.Model
-	// TODO not sure this does anything
 	Title       string `gorm:"not null"`
 	AlbumID     uint   `gorm:"not null"`
 	TrackNumber uint   `gorm:"not null"`
