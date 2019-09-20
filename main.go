@@ -22,6 +22,7 @@ func main() {
 	router.GET("/albums", handleListAlbums(db))
 	router.POST("/albums", handleCreateAlbums(db))
 	router.GET("/albums/:id", handleGetAlbum(db))
+	router.PATCH("/albums/:id", handleUpdateAlbum(db))
 	// TODO rest of albums CRUD
 
 	// TODO CRUD tracks
@@ -86,14 +87,21 @@ type Album struct {
 
 // AlbumVM view model for rendering Album.
 type AlbumVM struct {
+	ID    uint   `json:"id"`
 	Title string `json:"title"`
 	Year  uint   `json:"year"`
 }
 
-// CreateAlbumParams represents params for creating and album.
+// CreateAlbumParams represents params for creating an album.
 type CreateAlbumParams struct {
 	Title string `json:"title" binding:"required"`
 	Year  uint   `json:"year" binding:"required"`
+}
+
+// UpdateAlbumParams represents params for updating an album.
+type UpdateAlbumParams struct {
+	Title string `json:"title"`
+	Year  uint   `json:"year"`
 }
 
 func handleListAlbums(db *gorm.DB) func(c *gin.Context) {
@@ -132,6 +140,57 @@ func handleCreateAlbums(db *gorm.DB) func(c *gin.Context) {
 	}
 }
 
+func handleGetAlbum(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var album Album
+		db.Where("id = ?", id).First(&album)
+		if db.NewRecord(&album) {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+				"message": fmt.Sprintf("Cannot find album with id %s", id),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"album": renderAlbum(album),
+		})
+	}
+}
+
+func handleUpdateAlbum(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var album Album
+		db.Where("id = ?", id).First(&album)
+		if db.NewRecord(&album) {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+				"message": fmt.Sprintf("Cannot find album with id %s", id),
+			})
+			return
+		}
+
+		var params UpdateAlbumParams
+		err := c.BindJSON(&params)
+		if err != nil {
+			// TODO can you render this better?
+			c.AbortWithStatusJSON(422, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		// TODO what if this fails
+		db.Model(&album).Update(Album{
+			Title: params.Title,
+			Year:  params.Year,
+		})
+
+		c.JSON(http.StatusOK, gin.H{
+			"album": renderAlbum(album),
+		})
+	}
+}
+
 func listAlbums(db *gorm.DB) func() []Album {
 	return func() []Album {
 		var albums []Album
@@ -150,6 +209,7 @@ func renderAlbums(albums []Album) []AlbumVM {
 
 func renderAlbum(album Album) AlbumVM {
 	return AlbumVM{
+		ID:    album.ID,
 		Title: album.Title,
 		Year:  album.Year,
 	}
@@ -160,23 +220,6 @@ func createAlbum(db *gorm.DB) func(title string, year uint) Album {
 		album := Album{Title: title, Year: year}
 		db.Create(&album)
 		return album
-	}
-}
-
-func handleGetAlbum(db *gorm.DB) func(c *gin.Context) {
-	return func(c *gin.Context) {
-		id := c.Param("id")
-		var album Album
-		db.Where("id = ?", id).First(&album)
-		if db.NewRecord(&album) {
-			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
-				"message": fmt.Sprintf("Cannot find album with id %s", id),
-			})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{
-			"album": renderAlbum(album),
-		})
 	}
 }
 
