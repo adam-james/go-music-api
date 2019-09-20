@@ -23,7 +23,7 @@ func main() {
 	router.POST("/albums", handleCreateAlbums(db))
 	router.GET("/albums/:id", handleGetAlbum(db))
 	router.PATCH("/albums/:id", handleUpdateAlbum(db))
-	// TODO rest of albums CRUD
+	router.DELETE("/albums/:id", handleDeleteAlbum(db))
 
 	// TODO CRUD tracks
 
@@ -185,6 +185,25 @@ func handleUpdateAlbum(db *gorm.DB) func(c *gin.Context) {
 			Year:  params.Year,
 		})
 
+		c.JSON(http.StatusOK, gin.H{
+			"album": renderAlbum(album),
+		})
+	}
+}
+
+func handleDeleteAlbum(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var album Album
+		db.Where("id = ?", id).First(&album)
+		if db.NewRecord(&album) {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+				"message": fmt.Sprintf("Cannot find album with id %s", id),
+			})
+			return
+		}
+
+		db.Delete(&album)
 		c.JSON(http.StatusOK, gin.H{
 			"album": renderAlbum(album),
 		})
