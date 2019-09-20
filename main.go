@@ -143,14 +143,14 @@ func handleCreateAlbums(db *gorm.DB) func(c *gin.Context) {
 func handleGetAlbum(db *gorm.DB) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		var album Album
-		db.Where("id = ?", id).First(&album)
-		if db.NewRecord(&album) {
+		album, found := findAlbum(db)(id)
+		if !found {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 				"message": fmt.Sprintf("Cannot find album with id %s", id),
 			})
 			return
 		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"album": renderAlbum(album),
 		})
@@ -160,9 +160,8 @@ func handleGetAlbum(db *gorm.DB) func(c *gin.Context) {
 func handleUpdateAlbum(db *gorm.DB) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		var album Album
-		db.Where("id = ?", id).First(&album)
-		if db.NewRecord(&album) {
+		album, found := findAlbum(db)(id)
+		if !found {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 				"message": fmt.Sprintf("Cannot find album with id %s", id),
 			})
@@ -194,9 +193,8 @@ func handleUpdateAlbum(db *gorm.DB) func(c *gin.Context) {
 func handleDeleteAlbum(db *gorm.DB) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		var album Album
-		db.Where("id = ?", id).First(&album)
-		if db.NewRecord(&album) {
+		album, found := findAlbum(db)(id)
+		if !found {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 				"message": fmt.Sprintf("Cannot find album with id %s", id),
 			})
@@ -207,6 +205,17 @@ func handleDeleteAlbum(db *gorm.DB) func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"album": renderAlbum(album),
 		})
+	}
+}
+
+func findAlbum(db *gorm.DB) func(id string) (Album, bool) {
+	return func(id string) (Album, bool) {
+		var album Album
+		db.Where("id = ?", id).First(&album)
+		if db.NewRecord(&album) {
+			return album, false
+		}
+		return album, true
 	}
 }
 
