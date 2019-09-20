@@ -19,6 +19,12 @@ func main() {
 
 	router := gin.Default()
 
+	router.GET("/artists", handleListArtists(db))
+	router.POST("/artists", handleCreateArtist(db))
+	router.GET("/artists/:id", handleGetArtist(db))
+
+	// TODO rest of artist CRUD
+
 	router.GET("/albums", handleListAlbums(db))
 	router.POST("/albums", handleCreateAlbums(db))
 	router.GET("/albums/:id", handleGetAlbum(db))
@@ -45,6 +51,7 @@ func initDB() *gorm.DB {
 	}
 	db.AutoMigrate(&Album{})
 	db.AutoMigrate(&Track{})
+	db.AutoMigrate(&Artist{})
 	return db
 }
 
@@ -74,6 +81,99 @@ func seedDB(db *gorm.DB) {
 	for _, t := range tracks {
 		db.Create(&t)
 	}
+
+	db.Create(&Artist{Name: "Frank Ocean"})
+	db.Create(&Artist{Name: "Neil Young"})
+	db.Create(&Artist{Name: "Bob Dylan"})
+}
+
+// Artist Context
+
+// Artist db model
+type Artist struct {
+	gorm.Model
+	Name string `gorm:"not null" valid:"required"`
+}
+
+// ArtistVM is a view model for the artist
+type ArtistVM struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+}
+
+// CreateArtistParams are params for creating an Artist
+type CreateArtistParams struct {
+	Name string `json:"name" binding:"required"`
+}
+
+func handleListArtists(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var artists []Artist
+		db.Find(&artists)
+
+		c.JSON(http.StatusOK, gin.H{
+			"artists": renderArtists(artists),
+		})
+	}
+}
+
+func handleCreateArtist(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var params CreateArtistParams
+		err := c.BindJSON(&params)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		artist := Artist{Name: params.Name}
+		errs := db.Create(&artist).GetErrors()
+		if len(errs) > 0 {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+				"error": "An internal server error occurred.",
+			})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{
+			"artist": renderArtist(artist),
+		})
+	}
+}
+
+func handleGetArtist(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		var artist Artist
+		db.Where("id = ?", id).First(&artist)
+		if db.NewRecord(&artist) {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+				"message": fmt.Sprintf("Cannot find artist with id %s", id),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"artist": renderArtist(artist),
+		})
+	}
+}
+
+func renderArtist(artist Artist) ArtistVM {
+	return ArtistVM{
+		ID:   artist.ID,
+		Name: artist.Name,
+	}
+}
+
+func renderArtists(artists []Artist) []ArtistVM {
+	vms := make([]ArtistVM, len(artists))
+	for i, a := range artists {
+		vms[i] = renderArtist(a)
+	}
+	return vms
 }
 
 // ALBUM Context
