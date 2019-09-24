@@ -10,5 +10,5 @@ az acr create \
   --name $REGISTRY \
   --resource-group $GROUP \
   --location $LOCATION \
-  --sku Basic
+  --sku Basic \
   --admin-enabled true
