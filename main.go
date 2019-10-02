@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/qor/validations"
 )
 
@@ -45,13 +46,36 @@ func main() {
 // INIT
 
 func initDB() *gorm.DB {
-	db, err := gorm.Open("sqlite3", "test.db")
+	var dbConf string
+
+	if os.Getenv("APP_ENV") == "production" {
+		dbHost := os.Getenv("DB_HOST")
+		dbPort := "5432"
+		dbUser := os.Getenv("DB_USERNAME")
+		dbName := os.Getenv("DB_DATABASE")
+		dbPassword := os.Getenv("DB_PASSWORD")
+
+		dbConf = fmt.Sprintf(
+			"host=%s port=%s user=%s dbname=%s password=%s",
+			dbHost,
+			dbPort,
+			dbUser,
+			dbName,
+			dbPassword,
+		)
+	} else {
+		dbConf = "dbname=music_api_dev sslmode=disable"
+	}
+
+	db, err := gorm.Open("postgres", dbConf)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	db.AutoMigrate(&Album{})
 	db.AutoMigrate(&Track{})
 	db.AutoMigrate(&Artist{})
+
 	return db
 }
 
