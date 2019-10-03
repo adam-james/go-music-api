@@ -45,7 +45,7 @@ func main() {
 
 // INIT
 
-func initDB() *gorm.DB {
+func getPostgresConf() string {
 	var dbConf string
 
 	if os.Getenv("APP_ENV") == "production" {
@@ -66,6 +66,12 @@ func initDB() *gorm.DB {
 	} else {
 		dbConf = "dbname=music_api_dev sslmode=disable"
 	}
+
+	return dbConf
+}
+
+func initDB() *gorm.DB {
+	dbConf := getPostgresConf()
 
 	db, err := gorm.Open("postgres", dbConf)
 	if err != nil {
