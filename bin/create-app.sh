@@ -27,7 +27,7 @@ az webapp create \
   --name $APP \
   --deployment-container-image-name $REGISTRY.azurecr.io/music-api:$tag
 
-echo Configuring web app...
+echo Configuring container settings...
 az webapp config container set \
   --name $APP \
   --resource-group $GROUP \
@@ -36,8 +36,14 @@ az webapp config container set \
   --docker-registry-server-user $REGISTRY \
   --docker-registry-server-password $password
 
-echo Setting port...
+echo Configuring application settings...
 az webapp config appsettings set \
   --resource-group $GROUP \
   --name $APP \
-  --settings WEBSITES_PORT=8080
+  --settings WEBSITES_PORT=8080 APP_ENV=production DB_HOST=$DB_HOST DB_USERNAME=$DB_USERNAME DB_DATABASE=$DB_DATABASE DB_PASSWORD=$DB_PASSWORD
+
+echo Enabling logging...
+az webapp log config \
+  --resource-group $GROUP \
+  --name $APP \
+  --web-server-logging filesystem
